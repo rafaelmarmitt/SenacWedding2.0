@@ -34,6 +34,6 @@ app.get('*', (req, res) => {
 
 // INICIAR O SERVIDOR
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor Monolítico a correr na porta ${PORT}`);
-    console.log(`👉 Aceda à aplicação através de: http://localhost:${PORT}`);
+    console.log(` Servidor rodando na porta ${PORT}`);
+    console.log(`http://localhost:${PORT}`);
 });
