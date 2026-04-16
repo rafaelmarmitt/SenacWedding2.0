@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recepção - Wedding Pass</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="../css/style.css" rel="stylesheet">
+    <style>
+        .btn-pink {
+            background-color: #d63384;
+            border-color: #d63384;
+            color: white;
+        }
+
+        .btn-pink:hover {
+            background-color: #b02a6d;
+            border-color: #b02a6d;
+            color: white;
+        }
+    </style>
+</head>
+
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#">💍 Wedding Pass - Recepção</a>
+            <div class="d-flex align-items-center ms-auto">
+                <span class="me-3 fw-bold text-muted" id="user-info"></span>
+                <!-- Botão Admin oculto por padrão -->
+                <a href="../admin/dashboard.html" id="admin-actions"
+                    class="btn btn-outline-secondary btn-sm me-2 d-none"><i class="bi bi-gear"></i> Painel Admin</a>
+                <button class="btn btn-outline-danger btn-sm" id="btn-logout">Sair</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+                    <h4 class="mb-0 fw-bold">Controle de Entrada</h4>
+                    <div class="d-flex gap-2 w-100" style="max-width: 500px;">
+                        <div class="input-group flex-grow-1">
+                            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                            <input type="text" id="busca-recepcao" class="form-control"
+                                placeholder="Procurar convidado pelo nome..." oninput="buscarConvidados(this.value)">
+                        </div>
+                        <!-- NOVO BOTÃO AQUI -->
+                        <button class="btn btn-pink text-nowrap" data-bs-toggle="modal"
+                            data-bs-target="#modalNovoConvidado">
+                            <i class="bi bi-person-plus"></i> Novo
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
+                            <tr>
+                                <th>Convidado</th>
+                                <th>CPF</th>
+                                <th>Mesa</th>
+                                <th class="text-center">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-recepcao">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CADASTRO DE CONVIDADO -->
+    <div class="modal fade" id="modalNovoConvidado" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalNovoConvidadoLabel">Cadastrar Convidado Rápido</h5><button
+                        type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="form-novo-convidado">
+                    <div class="modal-body">
+                        <h6 class="text-muted border-bottom pb-2 mb-3">Dados Principais</h6>
+                        <div class="row mb-3">
+                            <div class="col-md-6"><label class="form-label">Nome *</label><input type="text"
+                                    class="form-control" id="cad-nome" required></div>
+                            <div class="col-md-6"><label class="form-label">Sobrenome *</label><input type="text"
+                                    class="form-control" id="cad-sobrenome" required></div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6"><label class="form-label">CPF (Opcional)</label><input type="text"
+                                    class="form-control" id="cad-cpf" placeholder="000.000.000-00" maxlength="14"
+                                    oninput="this.value=mascaraCPF(this.value)"></div>
+                            <div class="col-md-6"><label class="form-label">Telefone</label><input type="text"
+                                    class="form-control" id="cad-telefone" placeholder="(00) 00000-0000" maxlength="15"
+                                    oninput="this.value=mascaraTelefone(this.value)"></div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-8"><label class="form-label">E-mail</label><input type="email"
+                                    class="form-control" id="cad-email"></div>
+                            <div class="col-md-4"><label class="form-label">Nº Mesa *</label><input type="number"
+                                    class="form-control" id="cad-mesa" min="1" required></div>
+                        </div>
+                        <h6
+                            class="text-muted border-bottom pb-2 mt-4 mb-3 d-flex justify-content-between align-items-center">
+                            <span>Acompanhantes</span><button type="button" class="btn btn-sm btn-outline-secondary"
+                                onclick="adicionarCampoAcompanhante()"><i class="bi bi-plus-circle"></i> Adicionar
+                                Acompanhante</button>
+                        </h6>
+                        <div id="acompanhantes-container"></div>
+                        <div id="cadastro-msg" class="d-none text-center"></div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary"
+                            data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-pink">Salvar
+                            Convidado</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const mascaraCPF = v => v.replace(/\D/g, "").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+        const mascaraTelefone = v => v.replace(/\D/g, "").replace(/^(\d{2})(\d)/g, "($1) $2").replace(/(\d)(\d{4})$/, "$1-$2");
+    </script>
+    <script src="../js/api.js"></script>
+    <script src="../js/recepcao.js"></script>
+</body>
+
+</html>

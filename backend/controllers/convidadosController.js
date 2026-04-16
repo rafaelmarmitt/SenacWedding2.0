@@ -29,7 +29,7 @@ exports.listar = async (req, res) => {
 exports.criar = async (req, res) => {
     const { nome, sobrenome, cpf, telefone, email, numero_mesa, acompanhantes } = req.body;
     
-    if (cpf && !cpfLib.isCPF(cpf)) return res.status(400).json({ erro: 'O CPF introduzido é inválido. Verifique os números.' });
+    if (cpf && !cpfLib.isValidCPF(cpf)) return res.status(400).json({ erro: 'O CPF introduzido é inválido. Verifique os números.' });
 
     const conn = await db.getConnection();
     try {
@@ -61,7 +61,7 @@ exports.editar = async (req, res) => {
     const { id } = req.params;
     const { nome, sobrenome, cpf, telefone, email, numero_mesa, acompanhantes } = req.body;
     
-    if (cpf && !cpfLib.isCPF(cpf)) return res.status(400).json({ erro: 'O CPF introduzido é inválido. Verifique os números.' });
+    if (cpf && !cpfLib.isValidCPF(cpf)) return res.status(400).json({ erro: 'O CPF introduzido é inválido. Verifique os números.' });
 
     const conn = await db.getConnection();
     try {

@@ -14,6 +14,8 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+app.use(express.static(path.join(__dirname, '../frontend')));
+
 // 1. ROTAS DA API (Backend)
 app.use('/api/auth', authRoutes);
 app.use('/api/convidados', convidadosRoutes);
@@ -28,7 +30,7 @@ app.get('/api/status', (req, res) => {
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 // Rota de fallback
-app.get('*', (req, res) => {
+app.use((req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/index.html'));
 });
 
