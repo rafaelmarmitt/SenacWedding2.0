@@ -1,9 +1,14 @@
--- Criação do banco de dados unificado
-CREATE DATABASE IF NOT EXISTS wedding_pass;
+-- ==========================================
+-- SCRIPT COMPLETO DE CRIAÇÃO E POVOAMENTO (SEEDER)
+-- ==========================================
+
+-- Começa do zero para garantir que não há conflitos com a estrutura antiga
+DROP DATABASE IF EXISTS wedding_pass;
+CREATE DATABASE wedding_pass;
 USE wedding_pass;
 
 -- ==========================================
--- 1. TABELA DE USUÁRIOS
+-- 1. TABELA DE UTILIZADORES
 -- ==========================================
 CREATE TABLE IF NOT EXISTS usuarios (
     id_usuario INT AUTO_INCREMENT PRIMARY KEY,
@@ -15,7 +20,16 @@ CREATE TABLE IF NOT EXISTS usuarios (
 );
 
 -- ==========================================
--- 2. TABELA DE CONVIDADOS
+-- 2. TABELA DE MESAS (NOVA ESTRUTURA)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS mesas (
+    id_mesa INT AUTO_INCREMENT PRIMARY KEY,
+    numero_mesa INT NOT NULL UNIQUE,
+    capacidade INT NOT NULL DEFAULT 8
+);
+
+-- ==========================================
+-- 3. TABELA DE CONVIDADOS (AGORA LIGADA ÀS MESAS)
 -- ==========================================
 CREATE TABLE IF NOT EXISTS convidados (
     id_convidado INT AUTO_INCREMENT PRIMARY KEY,
@@ -24,11 +38,13 @@ CREATE TABLE IF NOT EXISTS convidados (
     cpf VARCHAR(14) UNIQUE,
     telefone VARCHAR(20),
     email VARCHAR(100),
-    numero_mesa INT
+    fk_mesa INT,
+    -- A Chave Estrangeira garante que o convidado pertence a uma mesa real
+    FOREIGN KEY (fk_mesa) REFERENCES mesas(id_mesa) ON DELETE SET NULL
 );
 
 -- ==========================================
--- 3. TABELA DE ACOMPANHANTES
+-- 4. TABELA DE ACOMPANHANTES
 -- ==========================================
 CREATE TABLE IF NOT EXISTS acompanhantes (
     id_acompanhante INT AUTO_INCREMENT PRIMARY KEY,
@@ -39,30 +55,37 @@ CREATE TABLE IF NOT EXISTS acompanhantes (
 );
 
 -- ==========================================
--- 4. TABELA DE CHECK-INS
+-- 5. TABELA DE CHECK-INS
 -- ==========================================
 CREATE TABLE IF NOT EXISTS checkins (
     id_checkin INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario INT NOT NULL,
     id_convidado INT NOT NULL,
     data_hora_chegada DATETIME DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uk_convidado UNIQUE (id_convidado), -- Impede duplicidade de check-in
-    -- Agora temos Chaves Estrangeiras reais cruzando toda a informação!
+    CONSTRAINT uk_convidado UNIQUE (id_convidado),
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
     FOREIGN KEY (id_convidado) REFERENCES convidados(id_convidado) ON DELETE CASCADE
 );
 
 -- ==========================================
--- 5. INSERÇÃO DE DADOS PADRÃO (SEEDERS)
+-- ==========================================
+-- INSERÇÃO DE DADOS PADRÃO (SEEDERS)
+-- ==========================================
 -- ==========================================
 
--- Usuários (Senha original: 123456)
+-- 1. Inserir Utilizadores (Senha original: 123456)
 INSERT INTO usuarios (nome, cpf, email, senha, perfil) VALUES
 ('Administrador Geral', '111.111.111-11', 'admin@weddingpass.com', '$2b$10$h5rMDg0U9pmcaX/BWlczj.S2HfilBGzw/Qdzs0Pz8I4dAjGB4zCvy', 'Admin'),
 ('Maria Cerimonialista', '222.222.222-22', 'maria@weddingpass.com', '$2b$10$h5rMDg0U9pmcaX/BWlczj.S2HfilBGzw/Qdzs0Pz8I4dAjGB4zCvy', 'Cerimonialista');
 
--- Convidados Variados
-INSERT INTO convidados (nome, sobrenome, cpf, telefone, email, numero_mesa) VALUES
+-- 2. Inserir Mesas (1 a 15 com capacidade para 10 pessoas)
+INSERT INTO mesas (numero_mesa, capacidade) VALUES 
+(1, 10), (2, 10), (3, 10), (4, 10), (5, 10),
+(6, 10), (7, 10), (8, 10), (9, 10), (10, 10),
+(11, 10), (12, 10), (13, 10), (14, 10), (15, 10);
+
+-- 3. Inserir Convidados (A coluna fk_mesa recebe os IDs gerados acima, que correspondem de 1 a 15)
+INSERT INTO convidados (nome, sobrenome, cpf, telefone, email, fk_mesa) VALUES
 ('Carlos', 'Silva', '001.000.000-01', '(11) 91111-1111', 'carlos.silva@email.com', 1),
 ('Ana', 'Souza', '002.000.000-02', '(11) 92222-2222', 'ana.souza@email.com', 1),
 ('Bruno', 'Costa', '003.000.000-03', '(11) 93333-3333', 'bruno.costa@email.com', 2),
@@ -94,7 +117,7 @@ INSERT INTO convidados (nome, sobrenome, cpf, telefone, email, numero_mesa) VALU
 ('Victor', 'Borges', '029.000.000-29', '(11) 99012-3456', 'victor.borges@email.com', 15),
 ('Aline', 'Machado', '030.000.000-30', '(11) 90123-4567', 'aline.machado@email.com', 15);
 
--- Acompanhantes
+-- 4. Inserir Acompanhantes
 INSERT INTO acompanhantes (nome, sobrenome, fk_convidado) VALUES
 ('João', 'Silva Junior', 1),
 ('Clara', 'Souza Lima', 2),

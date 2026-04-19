@@ -6,6 +6,9 @@ const path = require('path');
 const authRoutes = require('./routes/authRoutes');
 const convidadosRoutes = require('./routes/convidadosRoutes');
 const checkinRoutes = require('./routes/checkinRoutes');
+const usuariosRoutes = require('./routes/usuariosRoutes');
+const mesasRoutes = require('./routes/mesasRoutes');
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,7 +23,8 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 app.use('/api/auth', authRoutes);
 app.use('/api/convidados', convidadosRoutes);
 app.use('/api/checkins', checkinRoutes);
-
+app.use('/api/usuarios', usuariosRoutes);
+app.use('/api/mesas', mesasRoutes);
 // Rota de teste simples para garantir que a API está a funcionar
 app.get('/api/status', (req, res) => {
     res.json({ status: 'API Wedding Pass Online!', porta: PORT });
