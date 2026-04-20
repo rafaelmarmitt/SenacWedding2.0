@@ -1,55 +1,56 @@
-let graficoInstance = null, convidadosCache = [];
-let usuariosCache = [], mesasCache = [];
-const API_USUARIOS = '/api/usuarios';
-const API_MESAS = '/api/mesas';
+let graficoInstance = null, convidadosCache = [], usuariosCache = [], mesasCache = [];
+const API_USUARIOS = '/api/usuarios', API_MESAS = '/api/mesas';
+// NOTA: API_CONVIDADOS removida das constantes locais para evitar erro de duplicação caso já exista noutro ficheiro.
 
-// Inicializa a página e valida acessos
+// Helpers para otimização (renomeado de $ para byId para evitar conflitos com o jQuery)
+const byId = id => document.getElementById(id);
+const calcTotal = c => 1 + (c.acompanhantes?.length || 0);
+
 document.addEventListener("DOMContentLoaded", () => {
     const user = getUser();
     if (!user || user.perfil !== 'Admin') return window.location.href = '../index.html';
-
     if (typeof configurarNavbar === 'function') configurarNavbar('../index.html');
 
-    // Carrega dados Iniciais
+    // Carregamento Inicial
     carregarGraficoEstatisticas();
     carregarConvidadosAdmin();
     carregarUsuariosAdmin();
-    carregarMesasAdmin(); // Carrega a nova tabela de Mesas
+    carregarMesasAdmin();
 
     // Eventos Convidados
-    document.getElementById('form-novo-convidado')?.addEventListener('submit', cadastrarConvidado);
-    document.getElementById('modalNovoConvidado')?.addEventListener('hidden.bs.modal', () => {
-        document.getElementById('form-novo-convidado').reset();
-        document.getElementById('cad-id').value = '';
-        document.getElementById('acompanhantes-container').innerHTML = '';
-        document.getElementById('cadastro-msg').className = 'd-none';
-        document.getElementById('modalNovoConvidadoLabel').innerText = "Cadastrar Novo Convidado";
-        document.getElementById('btn-salvar-convidado').innerText = "Salvar Convidado";
+    byId('form-novo-convidado')?.addEventListener('submit', cadastrarConvidado);
+    byId('modalNovoConvidado')?.addEventListener('hidden.bs.modal', () => {
+        byId('form-novo-convidado').reset();
+        byId('cad-id').value = '';
+        byId('acompanhantes-container').innerHTML = '';
+        byId('cadastro-msg').className = 'd-none';
+        byId('modalNovoConvidadoLabel').innerText = "Cadastrar Novo Convidado";
+        byId('btn-salvar-convidado').innerText = "Salvar Convidado";
     });
 
-    document.getElementById('busca-dashboard')?.addEventListener('input', e => {
+    byId('busca-dashboard')?.addEventListener('input', e => {
         const t = e.target.value.toLowerCase();
         document.querySelectorAll('#tabela-convidados-admin tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(t) ? '' : 'none');
     });
 
     // Eventos Usuários
-    document.getElementById('form-novo-usuario')?.addEventListener('submit', salvarUsuario);
-    document.getElementById('modalUsuario')?.addEventListener('hidden.bs.modal', () => {
-        document.getElementById('form-novo-usuario').reset();
-        document.getElementById('usu-id').value = '';
-        document.getElementById('modalUsuarioLabel').innerText = "Novo Usuário";
-        document.getElementById('usu-senha').placeholder = "Senha obrigatória para novos";
-        document.getElementById('usu-senha').required = true;
+    byId('form-novo-usuario')?.addEventListener('submit', salvarUsuario);
+    byId('modalUsuario')?.addEventListener('hidden.bs.modal', () => {
+        byId('form-novo-usuario').reset();
+        byId('usu-id').value = '';
+        byId('modalUsuarioLabel').innerText = "Novo Usuário";
+        byId('usu-senha').placeholder = "Senha obrigatória para novos";
+        byId('usu-senha').required = true;
     });
 
     // Eventos Mesas
-    document.getElementById('form-nova-mesa')?.addEventListener('submit', salvarMesa);
-    document.getElementById('modalMesa')?.addEventListener('hidden.bs.modal', () => {
-        document.getElementById('form-nova-mesa').reset();
-        document.getElementById('mesa-id').value = '';
-        document.getElementById('modalMesaLabel').innerText = "Nova Mesa";
-        document.getElementById('mesa-capacidade').value = '8';
-        document.getElementById('mesa-msg').className = 'd-none';
+    byId('form-nova-mesa')?.addEventListener('submit', salvarMesa);
+    byId('modalMesa')?.addEventListener('hidden.bs.modal', () => {
+        byId('form-nova-mesa').reset();
+        byId('mesa-id').value = '';
+        byId('modalMesaLabel').innerText = "Nova Mesa";
+        byId('mesa-capacidade').value = '8';
+        byId('mesa-msg').className = 'd-none';
     });
 });
 
@@ -59,17 +60,21 @@ document.addEventListener("DOMContentLoaded", () => {
 async function carregarGraficoEstatisticas() {
     try {
         const convidados = await fetch(API_CONVIDADOS).then(r => r.json());
+        let t = 0, p = 0;
 
-        const t = convidados.length;
-        const p = convidados.filter(c => c.ja_entrou === 1 || c.ja_entrou === true).length;
+        convidados.forEach(c => {
+            const totalNoGrupo = calcTotal(c);
+            t += totalNoGrupo;
+            if (c.ja_entrou) p += totalNoGrupo;
+        });
+
         const a = Math.max(t - p, 0);
+        byId('kpi-total').innerText = t;
+        byId('kpi-presentes').innerText = p;
+        byId('kpi-ausentes').innerText = a;
+        byId('kpi-taxa').innerText = `${t > 0 ? Math.round((p / t) * 100) : 0}%`;
 
-        document.getElementById('kpi-total').innerText = t;
-        document.getElementById('kpi-presentes').innerText = p;
-        document.getElementById('kpi-ausentes').innerText = a;
-        document.getElementById('kpi-taxa').innerText = `${t > 0 ? Math.round((p / t) * 100) : 0}%`;
-
-        const ctx = document.getElementById('graficoOcupacao')?.getContext('2d');
+        const ctx = byId('graficoOcupacao')?.getContext('2d');
         if (!ctx) return;
         if (graficoInstance) graficoInstance.destroy();
 
@@ -78,7 +83,7 @@ async function carregarGraficoEstatisticas() {
             data: { labels: ['Presentes', 'Ausentes'], datasets: [{ data: [p, a], backgroundColor: ['#198754', '#dc3545'], borderWidth: 0 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
-    } catch (error) { console.error("Erro nas estatísticas:", error); }
+    } catch (error) { console.error("Erro estatísticas:", error); }
 }
 
 // ==========================================
@@ -87,32 +92,32 @@ async function carregarGraficoEstatisticas() {
 async function carregarConvidadosAdmin() {
     try {
         convidadosCache = await fetch(API_CONVIDADOS).then(r => r.json());
-        const tbody = document.getElementById('tabela-convidados-admin');
-        if (!tbody) return;
+        if (!byId('tabela-convidados-admin')) return;
 
-        tbody.innerHTML = convidadosCache.map(c => `
+        byId('tabela-convidados-admin').innerHTML = convidadosCache.map(c => `
             <tr>
-                <td><strong>${c.nome} ${c.sobrenome}</strong>${c.acompanhantes?.length ? `<br><small class="text-muted"><i class="bi bi-people-fill"></i> ${c.acompanhantes.map(a => `${a.nome} ${a.sobrenome}`).join(', ')}</small>` : ''}</td>
+                <td>
+                    <strong>${c.nome} ${c.sobrenome}</strong> <span class="badge bg-light text-dark border ms-1"><i class="bi bi-people-fill"></i> ${calcTotal(c)}</span>
+                    ${c.acompanhantes?.length ? `<br><small class="text-muted"><i class="bi bi-arrow-return-right"></i> ${c.acompanhantes.map(a => `${a.nome} ${a.sobrenome}`).join(', ')}</small>` : ''}
+                </td>
                 <td class="text-nowrap">${c.cpf || 'N/A'}</td>
                 <td class="text-nowrap">${c.telefone || 'N/A'}</td>
                 <td><span class="badge ${c.numero_mesa ? 'bg-secondary' : 'bg-danger'}">${c.numero_mesa ? `Mesa ${c.numero_mesa}` : 'S/ Mesa'}</span></td>
                 <td class="text-center text-nowrap">
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="abrirEdicao(${c.id_convidado})" title="Editar"><i class="bi bi-pencil-square"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="abrirExclusao(${c.id_convidado}, '${c.nome} ${c.sobrenome}')" title="Excluir"><i class="bi bi-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="abrirEdicao(${c.id_convidado})"><i class="bi bi-pencil-square"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="abrirExclusao(${c.id_convidado}, '${c.nome} ${c.sobrenome}')"><i class="bi bi-trash"></i></button>
                 </td>
-            </tr>
-        `).join('');
-    } catch (error) { console.error("Erro ao carregar convidados:", error); }
+            </tr>`).join('');
+    } catch (error) { console.error("Erro convidados:", error); }
 }
 
 window.adicionarCampoAcompanhante = (dados = null) => {
-    document.getElementById('acompanhantes-container').insertAdjacentHTML('beforeend', `
+    byId('acompanhantes-container').insertAdjacentHTML('beforeend', `
         <div class="row mb-2 acompanhante-item align-items-center">
             <div class="col-md-5"><input type="text" class="form-control form-control-sm acomp-nome" placeholder="Nome" required value="${dados?.nome || ''}"></div>
             <div class="col-md-5"><input type="text" class="form-control form-control-sm acomp-sobrenome" placeholder="Apelido" required value="${dados?.sobrenome || ''}"></div>
-            <div class="col-md-2 text-end"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.acompanhante-item').remove()" title="Remover"><i class="bi bi-trash"></i></button></div>
-        </div>
-    `);
+            <div class="col-md-2 text-end"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.acompanhante-item').remove()"><i class="bi bi-trash"></i></button></div>
+        </div>`);
 };
 
 window.abrirEdicao = (id) => {
@@ -120,53 +125,58 @@ window.abrirEdicao = (id) => {
     if (!c) return;
 
     ['id', 'nome', 'sobrenome', 'cpf', 'telefone', 'email', 'mesa'].forEach(k => {
-        const propDb = k === 'mesa' ? 'numero_mesa' : (k === 'id' ? 'id_convidado' : k);
-        document.getElementById(`cad-${k}`).value = c[propDb] || '';
+        byId(`cad-${k}`).value = c[k === 'mesa' ? 'numero_mesa' : (k === 'id' ? 'id_convidado' : k)] || '';
     });
 
-    document.getElementById('acompanhantes-container').innerHTML = '';
+    byId('acompanhantes-container').innerHTML = '';
     c.acompanhantes?.forEach(adicionarCampoAcompanhante);
 
-    document.getElementById('modalNovoConvidadoLabel').innerText = "Editar Convidado";
-    document.getElementById('btn-salvar-convidado').innerText = "Atualizar Convidado";
-    new bootstrap.Modal(document.getElementById('modalNovoConvidado')).show();
+    byId('modalNovoConvidadoLabel').innerText = "Editar Convidado";
+    byId('btn-salvar-convidado').innerText = "Atualizar Convidado";
+    new bootstrap.Modal(byId('modalNovoConvidado')).show();
 };
 
-window.abrirExclusao = (id, nomeCompleto) => {
-    document.getElementById('id-excluir').value = id;
-    document.getElementById('nome-excluir').innerText = nomeCompleto;
-    new bootstrap.Modal(document.getElementById('modalExcluirConvidado')).show();
+window.abrirExclusao = (id, nome) => {
+    byId('id-excluir').value = id;
+    byId('nome-excluir').innerText = nome;
+    new bootstrap.Modal(byId('modalExcluirConvidado')).show();
 };
 
 window.excluirConvidado = async () => {
     try {
-        const res = await fetch(`${API_CONVIDADOS}/${document.getElementById('id-excluir').value}`, { method: 'DELETE' });
-        if (!res.ok) return alert("Erro ao excluir o convidado.");
+        if (!(await fetch(`${API_CONVIDADOS}/${byId('id-excluir').value}`, { method: 'DELETE' })).ok) return alert("Erro ao excluir.");
         carregarConvidadosAdmin(); carregarGraficoEstatisticas(); carregarMesasAdmin();
-        bootstrap.Modal.getInstance(document.getElementById('modalExcluirConvidado'))?.hide();
-    } catch (error) { console.error("Erro ao excluir:", error); }
+        bootstrap.Modal.getInstance(byId('modalExcluirConvidado'))?.hide();
+    } catch (error) { console.error("Erro excluir:", error); }
 };
 
 async function cadastrarConvidado(e) {
     e.preventDefault();
-    const msgDiv = document.getElementById('cadastro-msg'), idEdicao = document.getElementById('cad-id').value;
-    const showError = (msg) => (msgDiv.innerText = msg, msgDiv.className = 'text-danger text-center mt-2 d-block');
+    const msgDiv = byId('cadastro-msg'), idEdicao = byId('cad-id').value;
+    const showError = msg => { msgDiv.innerText = msg; msgDiv.className = 'text-danger text-center mt-2 d-block'; };
     msgDiv.className = 'd-none';
 
     const dados = {
-        nome: document.getElementById('cad-nome').value, sobrenome: document.getElementById('cad-sobrenome').value,
-        cpf: document.getElementById('cad-cpf').value, telefone: document.getElementById('cad-telefone').value,
-        email: document.getElementById('cad-email').value, numero_mesa: document.getElementById('cad-mesa').value,
-        acompanhantes: Array.from(document.querySelectorAll('.acompanhante-item')).map(el => ({ nome: el.querySelector('.acomp-nome').value, sobrenome: el.querySelector('.acomp-sobrenome').value }))
+        nome: byId('cad-nome').value, sobrenome: byId('cad-sobrenome').value,
+        cpf: byId('cad-cpf').value, telefone: byId('cad-telefone').value,
+        email: byId('cad-email').value, numero_mesa: byId('cad-mesa').value,
+        acompanhantes: Array.from(document.querySelectorAll('.acompanhante-item')).map(el => ({
+            nome: el.querySelector('.acomp-nome').value,
+            sobrenome: el.querySelector('.acomp-sobrenome').value
+        }))
     };
 
     try {
-        const res = await fetch(`${API_CONVIDADOS}${idEdicao ? `/${idEdicao}` : ''}`, { method: idEdicao ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dados) });
-        if (!res.ok) return showError((await res.json()).erro || 'Erro ao processar a requisição.');
+        const res = await fetch(`${API_CONVIDADOS}${idEdicao ? `/${idEdicao}` : ''}`, {
+            method: idEdicao ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dados)
+        });
 
+        if (!res.ok) return showError((await res.json()).erro || 'Erro na requisição.');
         carregarConvidadosAdmin(); carregarGraficoEstatisticas(); carregarMesasAdmin();
-        bootstrap.Modal.getInstance(document.getElementById('modalNovoConvidado'))?.hide();
-    } catch (error) { showError('Falha de comunicação com o servidor.'); }
+        bootstrap.Modal.getInstance(byId('modalNovoConvidado'))?.hide();
+    } catch (error) { showError('Falha no servidor.'); }
 }
 
 // ==========================================
@@ -175,84 +185,66 @@ async function cadastrarConvidado(e) {
 async function carregarMesasAdmin() {
     try {
         mesasCache = await fetch(API_MESAS).then(r => r.json());
-        const tbody = document.getElementById('tabela-mesas-admin');
-        if (!tbody) return;
+        if (!byId('tabela-mesas-admin')) return;
 
-        tbody.innerHTML = mesasCache.map(m => {
-            const atingiuLimite = m.ocupacao >= m.capacidade;
-            const badgeClasse = atingiuLimite ? 'bg-danger' : (m.ocupacao > 0 ? 'bg-success' : 'bg-secondary');
-            return `
+        byId('tabela-mesas-admin').innerHTML = mesasCache.map(m => `
             <tr>
                 <td class="text-start"><strong>Mesa ${m.numero_mesa}</strong></td>
                 <td>${m.capacidade}</td>
-                <td><span class="badge ${badgeClasse}">${m.ocupacao} / ${m.capacidade}</span></td>
+                <td><span class="badge ${m.ocupacao >= m.capacidade ? 'bg-danger' : (m.ocupacao > 0 ? 'bg-success' : 'bg-secondary')}">${m.ocupacao} / ${m.capacidade}</span></td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary" onclick="abrirEdicaoMesa(${m.id_mesa})" title="Editar"><i class="bi bi-pencil-square"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="abrirExclusaoMesa(${m.id_mesa}, 'Mesa ${m.numero_mesa}')" title="Excluir"><i class="bi bi-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="abrirEdicaoMesa(${m.id_mesa})"><i class="bi bi-pencil-square"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="abrirExclusaoMesa(${m.id_mesa}, 'Mesa ${m.numero_mesa}')"><i class="bi bi-trash"></i></button>
                 </td>
-            </tr>
-        `}).join('');
-    } catch (error) { console.error("Erro ao carregar mesas:", error); }
+            </tr>`).join('');
+    } catch (error) { console.error("Erro mesas:", error); }
 }
 
 window.abrirEdicaoMesa = (id) => {
     const m = mesasCache.find(x => x.id_mesa === id);
     if (!m) return;
-    document.getElementById('mesa-id').value = m.id_mesa;
-    document.getElementById('mesa-numero').value = m.numero_mesa;
-    document.getElementById('mesa-capacidade').value = m.capacidade;
-    document.getElementById('modalMesaLabel').innerText = "Editar Mesa";
-    new bootstrap.Modal(document.getElementById('modalMesa')).show();
+    byId('mesa-id').value = m.id_mesa;
+    byId('mesa-numero').value = m.numero_mesa;
+    byId('mesa-capacidade').value = m.capacidade;
+    byId('modalMesaLabel').innerText = "Editar Mesa";
+    new bootstrap.Modal(byId('modalMesa')).show();
 };
 
 async function salvarMesa(e) {
     e.preventDefault();
-    const id = document.getElementById('mesa-id').value;
-    const msgDiv = document.getElementById('mesa-msg');
+    const id = byId('mesa-id').value, msgDiv = byId('mesa-msg');
     msgDiv.className = 'd-none';
-
-    const dados = {
-        numero_mesa: document.getElementById('mesa-numero').value,
-        capacidade: document.getElementById('mesa-capacidade').value
-    };
 
     try {
         const res = await fetch(`${API_MESAS}${id ? `/${id}` : ''}`, {
             method: id ? 'PUT' : 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(dados)
+            body: JSON.stringify({ numero_mesa: byId('mesa-numero').value, capacidade: byId('mesa-capacidade').value })
         });
 
         if (!res.ok) {
             msgDiv.innerText = (await res.json()).erro;
-            msgDiv.className = 'text-danger small mt-2 d-block';
-            return;
+            return msgDiv.className = 'text-danger small mt-2 d-block';
         }
-
-        carregarMesasAdmin();
-        carregarConvidadosAdmin(); // Porque o número da mesa pode ter mudado
-        bootstrap.Modal.getInstance(document.getElementById('modalMesa'))?.hide();
+        carregarMesasAdmin(); carregarConvidadosAdmin();
+        bootstrap.Modal.getInstance(byId('modalMesa'))?.hide();
     } catch (error) {
-        msgDiv.innerText = 'Erro ao comunicar com o servidor.';
+        msgDiv.innerText = 'Erro no servidor.';
         msgDiv.className = 'text-danger small mt-2 d-block';
     }
 }
 
 window.abrirExclusaoMesa = (id, nome) => {
-    document.getElementById('id-excluir-mesa').value = id;
-    document.getElementById('numero-excluir-mesa').innerText = nome;
-    new bootstrap.Modal(document.getElementById('modalExcluirMesa')).show();
+    byId('id-excluir-mesa').value = id;
+    byId('numero-excluir-mesa').innerText = nome;
+    new bootstrap.Modal(byId('modalExcluirMesa')).show();
 };
 
 window.excluirMesa = async () => {
     try {
-        const id = document.getElementById('id-excluir-mesa').value;
-        const res = await fetch(`${API_MESAS}/${id}`, { method: 'DELETE' });
-        if (!res.ok) return alert("Erro ao excluir mesa.");
-
-        carregarMesasAdmin();
-        carregarConvidadosAdmin(); // Atualiza a tabela porque os convidados desta mesa ficarão "Sem mesa"
-        bootstrap.Modal.getInstance(document.getElementById('modalExcluirMesa'))?.hide();
+        if (!(await fetch(`${API_MESAS}/${byId('id-excluir-mesa').value}`, { method: 'DELETE' })).ok) return alert("Erro ao excluir.");
+        carregarMesasAdmin(); carregarConvidadosAdmin();
+        bootstrap.Modal.getInstance(byId('modalExcluirMesa'))?.hide();
     } catch (error) { console.error(error); }
 };
 
@@ -262,140 +254,140 @@ window.excluirMesa = async () => {
 async function carregarUsuariosAdmin() {
     try {
         usuariosCache = await fetch(API_USUARIOS).then(r => r.json());
-        const tbody = document.getElementById('tabela-usuarios-admin');
-        if (!tbody) return;
+        if (!byId('tabela-usuarios-admin')) return;
 
-        tbody.innerHTML = usuariosCache.map(u => `
+        byId('tabela-usuarios-admin').innerHTML = usuariosCache.map(u => `
             <tr>
                 <td><strong>${u.nome}</strong></td>
                 <td class="text-nowrap">${u.cpf}</td>
                 <td><span class="badge ${u.perfil === 'Admin' ? 'bg-primary' : 'bg-info text-dark'}">${u.perfil}</span></td>
                 <td class="text-center text-nowrap">
-                    <button class="btn btn-sm btn-outline-warning me-1" onclick="alternarPerfilUsuario(${u.id_usuario}, '${u.perfil}')" title="Alternar Perfil"><i class="bi bi-arrow-left-right"></i></button>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="abrirEdicaoUsuario(${u.id_usuario})" title="Editar"><i class="bi bi-pencil-square"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="abrirExclusaoUsuario(${u.id_usuario}, '${u.nome}')" title="Excluir"><i class="bi bi-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-warning me-1" onclick="alternarPerfilUsuario(${u.id_usuario}, '${u.perfil}')"><i class="bi bi-arrow-left-right"></i></button>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="abrirEdicaoUsuario(${u.id_usuario})"><i class="bi bi-pencil-square"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="abrirExclusaoUsuario(${u.id_usuario}, '${u.nome}')"><i class="bi bi-trash"></i></button>
                 </td>
-            </tr>
-        `).join('');
-    } catch (error) { console.error("Erro ao carregar usuários:", error); }
+            </tr>`).join('');
+    } catch (error) { console.error("Erro usuários:", error); }
 }
 
-window.alternarPerfilUsuario = async (id, perfilAtual) => {
-    const novoPerfil = perfilAtual === 'Admin' ? 'Cerimonialista' : 'Admin';
-    if (!confirm(`Deseja alterar o perfil deste utilizador para ${novoPerfil}?`)) return;
+window.alternarPerfilUsuario = async (id, perfil) => {
+    const novoPerfil = perfil === 'Admin' ? 'Cerimonialista' : 'Admin';
+    if (!confirm(`Alterar utilizador para ${novoPerfil}?`)) return;
 
     try {
         const res = await fetch(`${API_USUARIOS}/${id}/perfil`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ perfil: novoPerfil }) });
-        if (res.ok) carregarUsuariosAdmin(); else alert((await res.json()).erro || "Erro ao alterar perfil.");
+        res.ok ? carregarUsuariosAdmin() : alert((await res.json()).erro || "Erro ao alterar.");
     } catch (error) { console.error(error); }
 };
 
 window.abrirEdicaoUsuario = (id) => {
     const u = usuariosCache.find(x => x.id_usuario === id);
     if (!u) return;
-    document.getElementById('usu-id').value = u.id_usuario;
-    document.getElementById('usu-nome').value = u.nome;
-    document.getElementById('usu-cpf').value = u.cpf;
-    document.getElementById('usu-email').value = u.email;
-    document.getElementById('usu-perfil').value = u.perfil;
-    document.getElementById('usu-senha').value = '';
-    document.getElementById('usu-senha').required = false;
-    document.getElementById('usu-senha').placeholder = "Deixe em branco para manter a atual";
-    document.getElementById('modalUsuarioLabel').innerText = "Editar Usuário";
-    new bootstrap.Modal(document.getElementById('modalUsuario')).show();
+    byId('usu-id').value = u.id_usuario; byId('usu-nome').value = u.nome;
+    byId('usu-cpf').value = u.cpf; byId('usu-email').value = u.email; byId('usu-perfil').value = u.perfil;
+    byId('usu-senha').value = ''; byId('usu-senha').required = false; byId('usu-senha').placeholder = "Vazio para manter a atual";
+    byId('modalUsuarioLabel').innerText = "Editar Usuário";
+    new bootstrap.Modal(byId('modalUsuario')).show();
 };
 
 async function salvarUsuario(e) {
     e.preventDefault();
-    const id = document.getElementById('usu-id').value;
-    const dados = { nome: document.getElementById('usu-nome').value, cpf: document.getElementById('usu-cpf').value, email: document.getElementById('usu-email').value, perfil: document.getElementById('usu-perfil').value };
-    const senha = document.getElementById('usu-senha').value;
+    const id = byId('usu-id').value, senha = byId('usu-senha').value;
+    const dados = { nome: byId('usu-nome').value, cpf: byId('usu-cpf').value, email: byId('usu-email').value, perfil: byId('usu-perfil').value };
     if (senha) dados.senha = senha;
 
     try {
         const res = await fetch(`${API_USUARIOS}${id ? `/${id}` : ''}`, { method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dados) });
-        if (!res.ok) return alert((await res.json()).erro || 'Erro ao guardar utilizador.');
+        if (!res.ok) return alert((await res.json()).erro || 'Erro ao guardar.');
         carregarUsuariosAdmin();
-        bootstrap.Modal.getInstance(document.getElementById('modalUsuario'))?.hide();
-    } catch (error) { alert('Falha de comunicação com o servidor.'); }
+        bootstrap.Modal.getInstance(byId('modalUsuario'))?.hide();
+    } catch (error) { alert('Falha no servidor.'); }
 }
 
 window.abrirExclusaoUsuario = (id, nome) => {
-    document.getElementById('id-excluir-usu').value = id;
-    document.getElementById('nome-excluir-usu').innerText = nome;
-    new bootstrap.Modal(document.getElementById('modalExcluirUsuario')).show();
+    byId('id-excluir-usu').value = id;
+    byId('nome-excluir-usu').innerText = nome;
+    new bootstrap.Modal(byId('modalExcluirUsuario')).show();
 };
 
 window.excluirUsuario = async () => {
     try {
-        const id = document.getElementById('id-excluir-usu').value;
-        const res = await fetch(`${API_USUARIOS}/${id}`, { method: 'DELETE' });
-        if (!res.ok) return alert("Erro ao excluir o utilizador.");
+        if (!(await fetch(`${API_USUARIOS}/${byId('id-excluir-usu').value}`, { method: 'DELETE' })).ok) return alert("Erro ao excluir.");
         carregarUsuariosAdmin();
-        bootstrap.Modal.getInstance(document.getElementById('modalExcluirUsuario'))?.hide();
+        bootstrap.Modal.getInstance(byId('modalExcluirUsuario'))?.hide();
     } catch (error) { console.error(error); }
 };
 
 // ==========================================
-// FUNÇÕES DE EXPORTAÇÃO E IMPORTAÇÃO
+// EXPORTAÇÃO E IMPORTAÇÃO
 // ==========================================
-function prepararDadosExportacao() {
-    return convidadosCache.map(c => ({
-        'Nome': c.nome, 'Sobrenome': c.sobrenome, 'CPF': c.cpf || '', 'Telefone': c.telefone || '',
-        'Email': c.email || '', 'Mesa': c.numero_mesa || '', 'Acompanhantes': c.acompanhantes?.map(a => `${a.nome} ${a.sobrenome}`).join(', ') || '',
-        'Status': c.ja_entrou ? 'Presente' : 'Ausente'
-    }));
-}
+const prepararExportacao = () => convidadosCache.map(c => ({
+    Nome: c.nome, Sobrenome: c.sobrenome, CPF: c.cpf || '', Telefone: c.telefone || '', Email: c.email || '',
+    Mesa: c.numero_mesa || '', Acompanhantes: c.acompanhantes?.map(a => `${a.nome} ${a.sobrenome}`).join(', ') || '',
+    Status: c.ja_entrou ? 'Presente' : 'Ausente'
+}));
 
 window.exportarExcel = () => {
-    if (!convidadosCache.length) return alert("Sem dados para exportar.");
-    const ws = XLSX.utils.json_to_sheet(prepararDadosExportacao()), wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Convidados");
+    if (!convidadosCache.length) return alert("Sem dados.");
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(prepararExportacao()), "Convidados");
     XLSX.writeFile(wb, `WeddingPass_Convidados_${Date.now()}.xlsx`);
 };
 
 window.exportarCSV = () => {
-    if (!convidadosCache.length) return alert("Sem dados para exportar.");
-    const csv = XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(prepararDadosExportacao()));
-    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    if (!convidadosCache.length) return alert("Sem dados.");
+    const blob = new Blob(["\uFEFF" + XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(prepararExportacao()))], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `WeddingPass_Convidados_${Date.now()}.csv`;
-    link.click();
+    link.href = URL.createObjectURL(blob); link.download = `WeddingPass_Convidados_${Date.now()}.csv`; link.click();
 };
 
 window.gerarPDF = () => {
-    if (!convidadosCache.length) return alert("Sem dados para exportar.");
-    const doc = new window.jspdf.jsPDF(), t = convidadosCache.length, p = convidadosCache.filter(c => c.ja_entrou).length;
+    if (!convidadosCache.length) return alert("Sem dados.");
+    let t = 0, p = 0;
+    convidadosCache.forEach(c => { const tot = calcTotal(c); t += tot; if (c.ja_entrou) p += tot; });
+
+    const doc = new window.jspdf.jsPDF();
     doc.setFontSize(20).setTextColor(214, 51, 132).text("Relatório de Convidados - Wedding Pass", 14, 20);
-    doc.setFontSize(10).setTextColor(100).text(`Data do Relatório: ${new Date().toLocaleString('pt-PT')}`, 14, 28);
+    doc.setFontSize(10).setTextColor(100).text(`Data: ${new Date().toLocaleString('pt-PT')}`, 14, 28);
     doc.setDrawColor(200).setFillColor(245, 245, 245).roundedRect(14, 35, 182, 25, 3, 3, 'FD');
     doc.setFontSize(11).setTextColor(0).text(`Total: ${t}`, 20, 42).text(`Compareceram: ${p}`, 20, 48).text(`Ausentes: ${t - p}`, 20, 54);
     doc.setFontSize(14).setTextColor(25, 135, 84).text(`${t > 0 ? ((p / t) * 100).toFixed(1) : 0}% de Presença`, 140, 50);
 
     doc.autoTable({
-        head: [["Convidado", "Mesa", "Status"]],
+        head: [["Convidado e Grupo", "Mesa", "Status"]],
         body: convidadosCache.map(c => [`${c.nome} ${c.sobrenome}${c.acompanhantes?.length ? '\n' + c.acompanhantes.map(a => `- ${a.nome} ${a.sobrenome}`).join('\n') : ''}`, `Mesa ${c.numero_mesa}`, c.ja_entrou ? "PRESENTE" : "AUSENTE"]),
-        startY: 65, theme: 'grid', headStyles: { fillColor: [214, 51, 132], halign: 'center' }, columnStyles: { 0: { cellWidth: 100 }, 1: { halign: 'center' }, 2: { halign: 'center', fontStyle: 'bold' } },
-        didParseCell: (d) => { if (d.section === 'body' && d.column.index === 2) d.cell.styles.textColor = d.cell.raw === "PRESENTE" ? [25, 135, 84] : [220, 53, 69]; },
-        styles: { fontSize: 9, cellPadding: 3 }
+        startY: 65, theme: 'grid', headStyles: { fillColor: [214, 51, 132] },
+        didParseCell: d => { if (d.section === 'body' && d.column.index === 2) d.cell.styles.textColor = d.cell.raw === "PRESENTE" ? [25, 135, 84] : [220, 53, 69]; }
     });
-    for (let i = 1, total = doc.internal.getNumberOfPages(); i <= total; i++) doc.setPage(i).setFontSize(8).setTextColor(150).text(`Página ${i} de ${total} - Wedding Pass`, 14, doc.internal.pageSize.height - 10);
-    doc.save(`WeddingPass_Relatorio_${Date.now()}.pdf`);
+
+    const totPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totPages; i++) doc.setPage(i).setFontSize(8).setTextColor(150).text(`Página ${i} de ${totPages}`, 14, doc.internal.pageSize.height - 10);
+    doc.save(`Relatorio_${Date.now()}.pdf`);
 };
 
 window.baixarModelo = () => {
-    const ws = XLSX.utils.json_to_sheet([{ "Nome": "Exemplo", "Sobrenome": "Silva", "CPF": "123.456.789-00", "Telefone": "11999999999", "Email": "exemplo@email.com", "Mesa": 5, "Acompanhantes": "Maria Silva, João Silva" }]);
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Modelo_Importacao"); XLSX.writeFile(wb, "Modelo_WeddingPass.xlsx");
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{
+        Nome: "Exemplo",
+        Sobrenome: "Silva",
+        CPF: "123.456.789-00",
+        Telefone: "11999999999",
+        Email: "ex@email.com",
+        Mesa: 5,
+        Acompanhantes: "Maria Silva, João Silva"
+    }]), "Modelo");
+    XLSX.writeFile(wb, "Modelo_WeddingPass.xlsx");
 };
 
 window.processarImportacao = async () => {
-    const fileInput = document.getElementById('file-import'), msgDiv = document.getElementById('import-msg'), btn = document.getElementById('btn-processar-import');
-    if (!fileInput.files.length) return alert('Por favor, selecione um arquivo primeiro.');
+    const fileInput = byId('file-import'), msgDiv = byId('import-msg'), btn = byId('btn-processar-import');
+    if (!fileInput.files.length) return alert('Selecione um arquivo.');
+
     const reader = new FileReader();
     reader.onload = async (e) => {
-        const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' }), jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-        if (!jsonData.length) return alert('O arquivo parece estar vazio ou tem um formato inválido.');
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const jsonData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+        if (!jsonData.length) return alert('Arquivo vazio ou inválido.');
 
         btn.disabled = true; msgDiv.className = 'text-primary fw-bold mt-2 d-block'; msgDiv.innerHTML = `<span class="spinner-border spinner-border-sm"></span> A processar ${jsonData.length} convidados...`;
         let sucessos = 0, erros = 0;
@@ -403,17 +395,36 @@ window.processarImportacao = async () => {
         for (const row of jsonData) {
             if (!row.Nome || !row.Sobrenome) { erros++; continue; }
             let acompanhantesTratados = [];
-            if (row.Acompanhantes) String(row.Acompanhantes).split(',').forEach(n => { const p = n.trim().split(' '); if (p.length > 0 && p[0]) acompanhantesTratados.push({ nome: p[0], sobrenome: p.slice(1).join(' ') || '' }); });
+            if (row.Acompanhantes) String(row.Acompanhantes).split(',').forEach(n => {
+                const p = n.trim().split(' ');
+                if (p[0]) acompanhantesTratados.push({
+                    nome: p[0],
+                    sobrenome: p.slice(1).join(' ') || ''
+                });
+            });
 
             try {
-                const res = await fetch(API_CONVIDADOS, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: String(row.Nome).trim(), sobrenome: String(row.Sobrenome).trim(), cpf: row.CPF ? String(row.CPF).trim() : null, telefone: row.Telefone ? String(row.Telefone).trim() : null, email: row.Email ? String(row.Email).trim() : null, numero_mesa: row.Mesa ? Number(row.Mesa) : 1, acompanhantes: acompanhantesTratados }) });
-                res.ok ? sucessos++ : erros++;
+                const body = JSON.stringify({
+                    nome: String(row.Nome).trim(),
+                    sobrenome: String(row.Sobrenome).trim(),
+                    cpf: row.CPF ? String(row.CPF).trim() : null,
+                    telefone: row.Telefone ? String(row.Telefone).trim() : null,
+                    email: row.Email ? String(row.Email).trim() : null,
+                    numero_mesa: row.Mesa ? Number(row.Mesa) : 1,
+                    acompanhantes: acompanhantesTratados
+                });
+                (await fetch(API_CONVIDADOS,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body
+                    })).ok ? sucessos++ : erros++;
             } catch (err) { erros++; }
         }
 
-        btn.disabled = false; msgDiv.className = 'text-success fw-bold mt-2 d-block'; msgDiv.innerText = `Importação concluída! Sucessos: ${sucessos} | Falhas: ${erros}`;
+        btn.disabled = false; msgDiv.className = 'text-success fw-bold mt-2 d-block'; msgDiv.innerText = `Concluído! Sucessos: ${sucessos} | Falhas: ${erros}`;
         fileInput.value = ''; carregarConvidadosAdmin(); carregarGraficoEstatisticas(); carregarMesasAdmin();
-        setTimeout(() => { bootstrap.Modal.getInstance(document.getElementById('modalImportar'))?.hide(); msgDiv.className = 'd-none'; }, 3000);
+        setTimeout(() => { bootstrap.Modal.getInstance(byId('modalImportar'))?.hide(); msgDiv.className = 'd-none'; }, 3000);
     };
     reader.readAsArrayBuffer(fileInput.files[0]);
 };
