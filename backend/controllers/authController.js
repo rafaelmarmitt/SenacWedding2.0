@@ -21,9 +21,15 @@ exports.login = async (req, res) => {
 
         // Gera o Token JWT válido por 8 horas
         const token = jwt.sign(
-            { id_usuario: usuario.id_usuario, perfil: usuario.perfil, nome: usuario.nome },
+            {
+                id_usuario: usuario.id_usuario,
+                perfil: usuario.perfil,
+                nome: usuario.nome
+            },
             process.env.JWT_SECRET || 'ChaveSecreta',
-            { expiresIn: '8h' }
+            {
+                expiresIn: '8h'
+            }
         );
 
         return res.json({
