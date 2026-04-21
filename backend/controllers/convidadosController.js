@@ -10,7 +10,10 @@ async function validarMesa(conn, numMesa, acompanhantes, idIgnorar = null) {
 
     // Se a mesa não existe, cria-a com capacidade padrão de 8
     if (!mesas.length) {
-        if (qtdEntrando > 8) throw { status: 400, erro: `A mesa ${numMesa} excede a capacidade padrão (8)!` };
+        if (qtdEntrando > 8) throw {
+            status: 400,
+            erro: `A mesa ${numMesa} excede a capacidade padrão (8)!`
+        };
         const [novaMesa] = await conn.execute('INSERT INTO mesas (numero_mesa, capacidade) VALUES (?, 8)', [numMesa]);
         return novaMesa.insertId;
     }
@@ -26,7 +29,9 @@ async function validarMesa(conn, numMesa, acompanhantes, idIgnorar = null) {
     `, params);
 
     if (Number(total) + qtdEntrando > capacidade) {
-        throw { status: 400, erro: `A mesa ${numMesa} não tem lugares suficientes! (Capacidade: ${capacidade} | Ocupados: ${total} | A entrar: ${qtdEntrando})` };
+        throw { 
+            status: 400, 
+            erro: `A mesa ${numMesa} não tem lugares suficientes! (Capacidade: ${capacidade} | Ocupados: ${total} | A entrar: ${qtdEntrando})` };
     }
 
     return id_mesa;
@@ -123,7 +128,7 @@ exports.editar = async (req, res) => {
         if (error.code === 'ER_DUP_ENTRY' && error.message.includes('cpf')) return res.status(409).json({ erro: 'Este CPF já está a ser utilizado.' });
         return res.status(500).json({ erro: 'Erro ao atualizar convidado.' });
     } finally {
-        conn.release();
+        conn.release(); 
     }
 };
 

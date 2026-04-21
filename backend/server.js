@@ -5,7 +5,7 @@ const path = require('path');
 
 const authRoutes = require('./routes/authRoutes');
 const convidadosRoutes = require('./routes/convidadosRoutes');
-const checkinRoutes = require('./routes/checkinRoutes');
+const checkinRoutes = require('./routes/checkinsRoutes');
 const usuariosRoutes = require('./routes/usuariosRoutes');
 const mesasRoutes = require('./routes/mesasRoutes');
 
