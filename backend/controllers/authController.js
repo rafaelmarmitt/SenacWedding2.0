@@ -11,15 +11,12 @@ exports.login = async (req, res) => {
     }
 
     try {
-        // Procura o utilizador na base de dados
         const [[usuario]] = await db.execute('SELECT * FROM usuarios WHERE email = ?', [email]);
 
-        // Se não existir ou a palavra-passe não coincidir, retorna erro
         if (!usuario || !(await bcrypt.compare(senha, usuario.senha))) {
             return res.status(401).json({ erro: 'Credenciais inválidas.' });
         }
 
-        // Gera o Token JWT válido por 8 horas
         const token = jwt.sign(
             {
                 id_usuario: usuario.id_usuario,

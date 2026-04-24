@@ -9,7 +9,6 @@ exports.realizarCheckin = async (req, res) => {
     }
 
     try {
-        // Tenta inserir o check-in. O constrangimento UNIQUE em id_convidado bloqueará duplicados.
         const [result] = await db.execute(
             'INSERT INTO checkins (id_usuario, id_convidado) VALUES (?, ?)',
             [id_usuario, id_convidado]
@@ -18,7 +17,6 @@ exports.realizarCheckin = async (req, res) => {
         return res.status(201).json({ mensagem: 'Check-in realizado com sucesso!', id_checkin: result.insertId });
 
     } catch (error) {
-        // Tratar erro de duplicidade (ER_DUP_ENTRY no MySQL)
         if (error.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({ erro: 'Este convidado já efetuou o check-in.' });
         }
@@ -30,8 +28,6 @@ exports.realizarCheckin = async (req, res) => {
 // Obter dados estatísticos
 exports.obterEstatisticas = async (req, res) => {
     try {
-        // Conta apenas os check-ins de convidados que ainda existem na base de dados
-        // (Isso garante que exclusões recentes mantenham as estatísticas precisas)
         const [[{ presentes }]] = await db.execute(
             'SELECT COUNT(c.id_convidado) AS presentes FROM convidados c JOIN checkins ch ON c.id_convidado = ch.id_convidado'
         );

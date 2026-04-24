@@ -1,7 +1,7 @@
 const db = require('../config/db');
 const bcrypt = require('bcrypt');
 
-// Listar todos os utilizadores (sem enviar as senhas para o frontend!)
+// Listar utilizadores
 exports.listar = async (req, res) => {
     try {
         const [usuarios] = await db.execute('SELECT id_usuario, nome, cpf, email, perfil FROM usuarios ORDER BY nome ASC');
@@ -12,7 +12,7 @@ exports.listar = async (req, res) => {
     }
 };
 
-// Criar um novo utilizador
+// Criar utilizador
 exports.criar = async (req, res) => {
     const { nome, cpf, email, senha, perfil } = req.body;
 
@@ -21,14 +21,13 @@ exports.criar = async (req, res) => {
     }
 
     try {
-        // Encripta a senha com 10 "salt rounds"
         const hash = await bcrypt.hash(senha, 10);
         
         await db.execute(
             'INSERT INTO usuarios (nome, cpf, email, senha, perfil) VALUES (?, ?, ?, ?, ?)',
             [nome, cpf, email, hash, perfil]
         );
-        
+
         return res.status(201).json({ mensagem: 'Utilizador criado com sucesso!' });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
@@ -39,25 +38,19 @@ exports.criar = async (req, res) => {
     }
 };
 
-// Editar um utilizador existente
+// Editar utilizador
 exports.editar = async (req, res) => {
     const { id } = req.params;
     const { nome, cpf, email, senha, perfil } = req.body;
 
     try {
         if (senha) {
-            // Se o admin preencheu o campo de senha, atualizamos com a nova senha encriptada
             const hash = await bcrypt.hash(senha, 10);
             await db.execute(
-                'UPDATE usuarios SET nome=?, cpf=?, email=?, senha=?, perfil=? WHERE id_usuario=?',
-                [nome, cpf, email, hash, perfil, id]
-            );
+                'UPDATE usuarios SET nome=?, cpf=?, email=?, senha=?, perfil=? WHERE id_usuario=?', [nome, cpf, email, hash, perfil, id]);
         } else {
-            // Se deixou em branco, atualizamos apenas os outros dados
             await db.execute(
-                'UPDATE usuarios SET nome=?, cpf=?, email=?, perfil=? WHERE id_usuario=?',
-                [nome, cpf, email, perfil, id]
-            );
+                'UPDATE usuarios SET nome=?, cpf=?, email=?, perfil=? WHERE id_usuario=?', [nome, cpf, email, perfil, id]);
         }
         
         return res.json({ mensagem: 'Utilizador atualizado com sucesso!' });
