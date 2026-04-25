@@ -46,7 +46,6 @@ exports.editar = async (req, res) => {
         } else {
             await db.execute('UPDATE usuarios SET nome=?, cpf=?, email=?, perfil=? WHERE id_usuario=?', [nome, cpf, email, perfil, id]);
         }
-
         return res.json({ mensagem: 'Utilizador atualizado com sucesso!' });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
