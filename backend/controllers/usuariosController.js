@@ -24,7 +24,6 @@ exports.criar = async (req, res) => {
         const hash = await bcrypt.hash(senha, 10);
 
         await db.execute('INSERT INTO usuarios (nome, cpf, email, senha, perfil) VALUES (?, ?, ?, ?, ?)', [nome, cpf, email, hash, perfil]);
-
         return res.status(201).json({ mensagem: 'Utilizador criado com sucesso!' });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
