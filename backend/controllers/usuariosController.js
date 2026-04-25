@@ -23,10 +23,7 @@ exports.criar = async (req, res) => {
     try {
         const hash = await bcrypt.hash(senha, 10);
         
-        await db.execute(
-            'INSERT INTO usuarios (nome, cpf, email, senha, perfil) VALUES (?, ?, ?, ?, ?)',
-            [nome, cpf, email, hash, perfil]
-        );
+        await db.execute('INSERT INTO usuarios (nome, cpf, email, senha, perfil) VALUES (?, ?, ?, ?, ?)', [nome, cpf, email, hash, perfil]);
 
         return res.status(201).json({ mensagem: 'Utilizador criado com sucesso!' });
     } catch (error) {
