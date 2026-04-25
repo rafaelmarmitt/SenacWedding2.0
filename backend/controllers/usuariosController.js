@@ -22,7 +22,7 @@ exports.criar = async (req, res) => {
 
     try {
         const hash = await bcrypt.hash(senha, 10);
-        
+
         await db.execute('INSERT INTO usuarios (nome, cpf, email, senha, perfil) VALUES (?, ?, ?, ?, ?)', [nome, cpf, email, hash, perfil]);
 
         return res.status(201).json({ mensagem: 'Utilizador criado com sucesso!' });
@@ -43,13 +43,11 @@ exports.editar = async (req, res) => {
     try {
         if (senha) {
             const hash = await bcrypt.hash(senha, 10);
-            await db.execute(
-                'UPDATE usuarios SET nome=?, cpf=?, email=?, senha=?, perfil=? WHERE id_usuario=?', [nome, cpf, email, hash, perfil, id]);
+            await db.execute('UPDATE usuarios SET nome=?, cpf=?, email=?, senha=?, perfil=? WHERE id_usuario=?', [nome, cpf, email, hash, perfil, id]);
         } else {
-            await db.execute(
-                'UPDATE usuarios SET nome=?, cpf=?, email=?, perfil=? WHERE id_usuario=?', [nome, cpf, email, perfil, id]);
+            await db.execute('UPDATE usuarios SET nome=?, cpf=?, email=?, perfil=? WHERE id_usuario=?', [nome, cpf, email, perfil, id]);
         }
-        
+
         return res.json({ mensagem: 'Utilizador atualizado com sucesso!' });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
