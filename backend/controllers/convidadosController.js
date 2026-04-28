@@ -1,58 +1,75 @@
 const db = require('../config/db');
 const cpfLib = require('js-cpf-validation');
 
+// Função auxiliar para inserir acompanhantes e evitar repetição de código
+const salvarAcompanhantes = async (acompanhantes, fk_convidado) => {
+    if (!acompanhantes?.length) return;
+    const promises = acompanhantes.map(a => 
+        db.execute('INSERT INTO acompanhantes (nome, sobrenome, fk_convidado) VALUES (?, ?, ?)', [a.nome, a.sobrenome, fk_convidado])
+    );
+    await Promise.all(promises);
+};
+
+// Valida a existência e a capacidade da mesa
+const verificarMesa = async (numero_mesa, qtd_entrando, id_ignorar = null) => {
+    const [mesas] = await db.execute('SELECT id_mesa, capacidade FROM mesas WHERE numero_mesa = ?', [numero_mesa]);
+    if (!mesas.length) return { erro: `A mesa ${numero_mesa} não existe. Crie-a no painel primeiro.` };
+
+    const { id_mesa, capacidade } = mesas[0];
+
+    let query = `
+        SELECT COUNT(DISTINCT c.id_convidado) + COUNT(a.id_acompanhante) AS total
+        FROM convidados c
+        LEFT JOIN acompanhantes a ON c.id_convidado = a.fk_convidado
+        WHERE c.fk_mesa = ?
+    `;
+    const params = [id_mesa];
+
+    if (id_ignorar) {
+        query += ' AND c.id_convidado != ?';
+        params.push(id_ignorar);
+    }
+
+    const [[{ total }]] = await db.execute(query, params);
+    
+    if ((parseInt(total) || 0) + qtd_entrando > capacidade) {
+        return { erro: `A mesa ${numero_mesa} excedeu a capacidade.` };
+    }
+
+    return { fk_mesa: id_mesa };
+};
+
 // Listar convidados
 exports.listar = async (req, res) => {
     try {
         const termo = req.query.busca ? `%${req.query.busca}%` : null;
-        
-        const query = termo 
-            ? `SELECT c.*, m.numero_mesa, EXISTS(SELECT 1 FROM checkins ch WHERE ch.id_convidado = c.id_convidado) AS ja_entrou 
-               FROM convidados c 
-               LEFT JOIN mesas m ON c.fk_mesa = m.id_mesa 
-               WHERE c.nome LIKE ? OR c.sobrenome LIKE ? OR c.cpf LIKE ? 
-               ORDER BY c.nome ASC`
-            : `SELECT c.*, m.numero_mesa, EXISTS(SELECT 1 FROM checkins ch WHERE ch.id_convidado = c.id_convidado) AS ja_entrou 
-               FROM convidados c 
-               LEFT JOIN mesas m ON c.fk_mesa = m.id_mesa 
-               ORDER BY c.nome ASC`;
-            
-        const [convidados] = await db.execute(query, termo ? [termo, termo, termo] : []);
+        let query = `
+            SELECT c.*, m.numero_mesa, EXISTS(SELECT 1 FROM checkins ch WHERE ch.id_convidado = c.id_convidado) AS ja_entrou 
+            FROM convidados c 
+            LEFT JOIN mesas m ON c.fk_mesa = m.id_mesa
+        `;
+        const params = [];
 
-        // Preenche os acompanhantes de cada convidado
-        for (let c of convidados) {
+        if (termo) {
+            query += ` WHERE c.nome LIKE ? OR c.sobrenome LIKE ? OR c.cpf LIKE ?`;
+            params.push(termo, termo, termo);
+        }
+        
+        query += ` ORDER BY c.nome ASC`;
+            
+        const [convidados] = await db.execute(query, params);
+
+        // Preenche os acompanhantes em paralelo para maior performance
+        await Promise.all(convidados.map(async (c) => {
             const [acompanhantes] = await db.execute('SELECT nome, sobrenome FROM acompanhantes WHERE fk_convidado = ?', [c.id_convidado]);
             c.acompanhantes = acompanhantes;
-        }
+        }));
 
         return res.json(convidados);
     } catch (error) {
         console.error('Erro ao listar:', error);
         return res.status(500).json({ erro: 'Erro ao obter dados.' });
     }
-};
-
-// FUNÇÃO AUXILIAR (DRY)
-// Valida a existência e a capacidade da mesa
-const verificarMesa = async (numero_mesa, qtd_entrando, id_ignorar = null) => {
-    const [mesas] = await db.execute('SELECT id_mesa, capacidade FROM mesas WHERE numero_mesa = ?', [numero_mesa]);
-    if (mesas.length === 0) return { erro: `A mesa ${numero_mesa} não existe. Crie-a no painel primeiro.` };
-
-    const fk_mesa = mesas[0].id_mesa;
-    const query = `
-        SELECT COUNT(DISTINCT c.id_convidado) + COUNT(a.id_acompanhante) AS total
-        FROM convidados c
-        LEFT JOIN acompanhantes a ON c.id_convidado = a.fk_convidado
-        WHERE c.fk_mesa = ? ${id_ignorar ? 'AND c.id_convidado != ?' : ''}
-    `;
-    
-    // Passa o ID a ignorar (para não contar as pessoas de um convidado que apenas está a ser editado)
-    const [ocupacao] = await db.execute(query, id_ignorar ? [fk_mesa, id_ignorar] : [fk_mesa]);
-    
-    const pessoasAtuais = parseInt(ocupacao[0].total) || 0;
-    if (pessoasAtuais + qtd_entrando > mesas[0].capacidade) return { erro: `A mesa ${numero_mesa} excedeu a capacidade.` };
-
-    return { fk_mesa }; // Devolve o ID da mesa caso passe nas validações
 };
 
 // Criar novo convidado
@@ -65,8 +82,7 @@ exports.criar = async (req, res) => {
         let fk_mesa = null;
 
         if (numero_mesa) {
-            // Usa a função auxiliar para não repetir código!
-            const validacao = await verificarMesa(numero_mesa, 1 + (acompanhantes ? acompanhantes.length : 0));
+            const validacao = await verificarMesa(numero_mesa, 1 + (acompanhantes?.length || 0));
             if (validacao.erro) return res.status(400).json({ erro: validacao.erro });
             fk_mesa = validacao.fk_mesa;
         }
@@ -76,17 +92,13 @@ exports.criar = async (req, res) => {
             [nome, sobrenome, cpf || null, telefone || null, email || null, fk_mesa]
         );
         
-        if (acompanhantes?.length) {
-            for (let a of acompanhantes) {
-                await db.execute('INSERT INTO acompanhantes (nome, sobrenome, fk_convidado) VALUES (?, ?, ?)', [a.nome, a.sobrenome, insertId]);
-            }
-        }
+        await salvarAcompanhantes(acompanhantes, insertId);
 
-        return res.status(201).json({ mensagem: 'Convidado registado com sucesso!' });
+        return res.status(201).json({ mensagem: 'Convidado registrado com sucesso!' });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ erro: 'Este CPF já está cadastrado.' });
-        console.error('Erro ao registar:', error);
-        return res.status(500).json({ erro: 'Erro ao registar convidado.' });
+        console.error('Erro ao registrar:', error);
+        return res.status(500).json({ erro: 'Erro ao registrar convidado.' });
     }
 };
 
@@ -101,8 +113,7 @@ exports.editar = async (req, res) => {
         let fk_mesa = null;
 
         if (numero_mesa) {
-            // Reaproveita a mesma função, passando o "id" para ser ignorado no cálculo
-            const validacao = await verificarMesa(numero_mesa, 1 + (acompanhantes ? acompanhantes.length : 0), id);
+            const validacao = await verificarMesa(numero_mesa, 1 + (acompanhantes?.length || 0), id);
             if (validacao.erro) return res.status(400).json({ erro: validacao.erro });
             fk_mesa = validacao.fk_mesa;
         }
@@ -113,12 +124,7 @@ exports.editar = async (req, res) => {
         );
         
         await db.execute('DELETE FROM acompanhantes WHERE fk_convidado = ?', [id]);
-        
-        if (acompanhantes?.length) {
-            for (let a of acompanhantes) {
-                await db.execute('INSERT INTO acompanhantes (nome, sobrenome, fk_convidado) VALUES (?, ?, ?)', [a.nome, a.sobrenome, id]);
-            }
-        }
+        await salvarAcompanhantes(acompanhantes, id);
 
         return res.json({ mensagem: 'Convidado atualizado com sucesso!' });
     } catch (error) {
