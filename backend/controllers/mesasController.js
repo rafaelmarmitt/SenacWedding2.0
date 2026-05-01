@@ -1,20 +1,20 @@
 const db = require('../config/db');
 
-// Listar mesas
+// Listar Mesas
 exports.listar = async (req, res) => {
     try {
         const query = `
-            SELECT 
-                m.id_mesa, 
-                m.numero_mesa, 
-                m.capacidade,
-                COUNT(DISTINCT c.id_convidado) + COUNT(a.id_acompanhante) AS ocupacao
-            FROM mesas m
-            LEFT JOIN convidados c ON m.id_mesa = c.fk_mesa
-            LEFT JOIN acompanhantes a ON c.id_convidado = a.fk_convidado
-            GROUP BY m.id_mesa, m.numero_mesa, m.capacidade
-            ORDER BY m.numero_mesa ASC
-        `;
+                SELECT 
+                    m.id_mesa, 
+                    m.numero_mesa, 
+                    m.capacidade,
+                    COUNT(DISTINCT c.id_convidado) + COUNT(a.id_acompanhante) AS ocupacao
+                FROM mesas m
+                LEFT JOIN convidados c ON m.id_mesa = c.fk_mesa
+                LEFT JOIN acompanhantes a ON c.id_convidado = a.fk_convidado
+                GROUP BY m.id_mesa, m.numero_mesa, m.capacidade
+                ORDER BY m.numero_mesa ASC
+            `;
         const [mesas] = await db.execute(query);
         return res.json(mesas);
     } catch (error) {
@@ -33,10 +33,7 @@ exports.criar = async (req, res) => {
 
     try {
         const cap = capacidade || 8; // Capacidade padrão se não for enviada
-        const [{ insertId }] = await db.execute(
-            'INSERT INTO mesas (numero_mesa, capacidade) VALUES (?, ?)',
-            [numero_mesa, cap]
-        );
+        const [{ insertId }] = await db.execute('INSERT INTO mesas (numero_mesa, capacidade) VALUES (?, ?)', [numero_mesa, cap]);
         return res.status(201).json({ mensagem: 'Mesa criada com sucesso!', id: insertId });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
@@ -52,16 +49,20 @@ exports.editar = async (req, res) => {
     const { id } = req.params;
     const { numero_mesa, capacidade } = req.body;
 
-    if (!numero_mesa || !capacidade) return res.status(400).json({ erro: 'Número e capacidade são obrigatórios.' });
+    if (!numero_mesa || !capacidade) {
+        return res.status(400).json({ erro: 'Número e capacidade são obrigatórios.' });
+    }
 
     try {
         const [[{ ocupacao }]] = await db.execute(`
-            SELECT COUNT(DISTINCT c.id_convidado) + COUNT(a.id_acompanhante) AS ocupacao
-            FROM convidados c LEFT JOIN acompanhantes a ON c.id_convidado = a.fk_convidado
-            WHERE c.fk_mesa = ?
-        `, [id]);
+                SELECT COUNT(DISTINCT c.id_convidado) + COUNT(a.id_acompanhante) AS ocupacao
+                FROM convidados c LEFT JOIN acompanhantes a ON c.id_convidado = a.fk_convidado
+                WHERE c.fk_mesa = ?
+            `, [id]);
 
-        if (capacidade < ocupacao) return res.status(400).json({ erro: `Capacidade inválida: a mesa já possui ${ocupacao} pessoas.` });
+        if (capacidade < ocupacao) {
+            return res.status(400).json({ erro: `Capacidade inválida: a mesa já possui ${ocupacao} pessoas.` });
+        }
         await db.execute('UPDATE mesas SET numero_mesa=?, capacidade=? WHERE id_mesa=?', [numero_mesa, capacidade, id]);
         return res.json({ mensagem: 'Mesa atualizada com sucesso!' });
 
